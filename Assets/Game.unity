@@ -285,6 +285,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   landmark_prefab_: {fileID: 1048140499381570, guid: 12ba3d871902d49e08a9d8f2544a1893,
     type: 2}
+  model_prefab_:
+  - {fileID: 1964245166370238, guid: f06951d8d54204a6990f0c5f2b8832c0, type: 2}
+  - {fileID: 1078448458494934, guid: b36462066f2d28e4ea4e5bc3e9a0a4d4, type: 2}
+  - {fileID: 1182218990467568, guid: e32e317dff8eb42babd87689b024762f, type: 2}
+  - {fileID: 1293528126090600, guid: 119521abff58a4fc4832cc9ab8d0bd9a, type: 2}
+  - {fileID: 1779232939417300, guid: 290284c57cc914a64852ca23a7d47a97, type: 2}
+  - {fileID: 1523159450559070, guid: 47437813a1b2546a3a78cda7897e4f13, type: 2}
+  - {fileID: 1024661509078128, guid: 1a2391707ec9e441e9bf93fe28bdfa98, type: 2}
 --- !u!4 &764760766
 Transform:
   m_ObjectHideFlags: 0

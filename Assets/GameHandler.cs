@@ -7,6 +7,8 @@ public class GameHandler : MonoBehaviour
 	public GameObject landmark_prefab_;
     public GameObject[] model_prefab_;
 	Landmark[,] landmark_map_ = new Landmark[4,4];
+    List<Landmark> landmark_destroy_ = new List<Landmark>();
+	bool all_busy_ = false;
 
 	void Start () {
 		for (int i = 0; i < 4; i++) {
@@ -21,230 +23,207 @@ public class GameHandler : MonoBehaviour
 	
 	void Update ()
 	{
-        bool moved = false;
-		if (Input.GetKeyDown(KeyCode.UpArrow)) {
-			for (int i = 0; i < 4; i++)
-            {
-                bool merged = false;
-                int pos = (landmark_map_[i, 3]) ? 2 : 3;
-				for (int j = 2; j >= 0; j--) {
-					Landmark landmark = landmark_map_[i, j];
-					if (landmark) {
-                        Landmark prev = landmark_map_[i, j + 1];
-                        if (prev)
-                        {
-                            pos = j;
-                            if (prev.level_ == landmark.level_ && prev.level_ <= 7 && !merged)
-                            {
-                                merged = true;
-                                moved = true;
-                                Vector2Int tile_pos = prev.tile_pos_;
-                                int level = prev.level_ + 1;
-                                DeleteLandmark(landmark);
-                                DeleteLandmark(prev);
-                                prev = AddLandmark(tile_pos, level);
-                                continue;
-                            }
-                            pos = j - 1;
-                        }
-                        else
-                        {
-                            prev = landmark;
-                            if (j != pos)
-                            {
-                                merged = true;
-                                moved = true;
-                                MoveLandmark(landmark, new Vector2Int(i, pos));
-                                pos--;
-                            }
-                        }
+        bool busy = false;
+        for (int i = 0; i < 4; i++) {
+            for (int j = 0; j < 4; j++) {
+                Landmark landmark = landmark_map_[i, j];
+                if (!landmark)
+                    continue;
+
+                if (landmark.disable_) {
+                    DeleteLandmark(landmark);
+                    continue;
+                }
+
+                if (landmark.upgrade_) {
+                    AddLandmark(landmark.tile_pos_, landmark.level_ + 1);
+                    continue;
+                }
+
+                landmark.Move();
+                busy = busy || landmark.busy_;
+            }
+        }
+
+        foreach (Landmark landmark in landmark_destroy_) {
+            Destroy(landmark.gameObject);
+        }
+        landmark_destroy_.Clear();
+
+        if (busy) {
+            all_busy_ = true;
+            return;
+        }
+
+        if (all_busy_) {
+            all_busy_ = false;
+
+            List<Vector2Int> empty_list = new List<Vector2Int>();
+            for (int i = 0; i < 4; i++) {
+                if (i > 0 && i < 3)
+                    continue;
+
+                for (int j = 0; j < 4; j++) {
+                    if (j > 0 && j < 3)
+                        continue;
+
+                    if (!landmark_map_[i, j]) {
+                        empty_list.Add(new Vector2Int(i, j));
                     }
                 }
-			}
-		} else if (Input.GetKeyDown(KeyCode.DownArrow)) {
-			for (int i = 0; i < 4; i++)
-            {
+            }
+            if (empty_list.Count <= 0)
+                return;
+
+            AddLandmark(empty_list[Random.Range(0, empty_list.Count)], 1);
+            return;
+        }
+
+        if (Input.GetKeyDown(KeyCode.UpArrow)) {
+            for (int i = 0; i < 4; i++) {
+                int pos = 3;
                 bool merged = false;
-                int pos = (landmark_map_[i, 0]) ? 1 : 0;
-                for (int j = 1; j < 4; j++) {
-					Landmark landmark = landmark_map_[i, j];
-					if (landmark)
-                    {
+                for (int j = 3; j >= 0; j--) {
+                    Landmark landmark = landmark_map_[i, j];
+                    if (!landmark)
+                        continue;
+                    
+                    if (!merged && j == pos && j < 3) {
+                        Landmark prev = landmark_map_[i, j + 1];
+                        if (prev) {
+                            if (prev.level_ == landmark.level_) {
+                                landmark.target_merge_ = prev;
+                                MoveLandmark(landmark, new Vector2Int(i, j + 1));
+                                merged = true;
+                                continue;
+                            }
+                        }
+                    }
+
+                    if (pos != j)
+                        MoveLandmark(landmark, new Vector2Int(i, pos));
+                    pos--;
+                }
+            }
+        } else if (Input.GetKeyDown(KeyCode.DownArrow)) {
+            for (int i = 0; i < 4; i++) {
+                int pos = 0;
+                bool merged = false;
+                for (int j = 0; j < 4; j++) {
+                    Landmark landmark = landmark_map_[i, j];
+                    if (!landmark)
+                        continue;
+                    
+                    if (!merged && j == pos & j > 0) {
                         Landmark prev = landmark_map_[i, j - 1];
-                        if (prev)
-                        {
-                            pos = j;
-                            if (prev.level_ == landmark.level_ && prev.level_ <= 7 && !merged)
-                            {
+                        if (prev) {
+                            if (prev.level_ == landmark.level_) {
+                                landmark.target_merge_ = prev;
+                                MoveLandmark(landmark, new Vector2Int(i, j - i));
                                 merged = true;
-                                moved = true;
-                                Vector2Int tile_pos = prev.tile_pos_;
-                                int level = prev.level_ + 1;
-                                DeleteLandmark(landmark);
-                                DeleteLandmark(prev);
-                                prev = AddLandmark(tile_pos, level);
                                 continue;
-                            }
-                            pos = j + 1;
-                        }
-                        else
-                        {
-                            prev = landmark;
-                            if (j != pos)
-                            {
-                                merged = true;
-                                moved = true;
-                                MoveLandmark(landmark, new Vector2Int(i, pos));
-                                pos++;
                             }
                         }
                     }
-				}
-			}
-		} else if (Input.GetKeyDown(KeyCode.LeftArrow)) {
-			for (int j = 0; j < 4; j++)
-            {
+
+                    if (pos != j)
+                        MoveLandmark(landmark, new Vector2Int(i, pos));
+                    pos++;
+                }
+            }
+        } else if (Input.GetKeyDown(KeyCode.LeftArrow)) {
+            for (int j = 0; j < 4; j++) {
+                int pos = 0;
                 bool merged = false;
-                int pos = (landmark_map_[0, j]) ? 1 : 0;
-                for (int i = 1; i < 4; i++) {
-					Landmark landmark = landmark_map_[i, j];
-					if (landmark)
-                    {
+                for (int i = 0; i < 4; i++) {
+                    Landmark landmark = landmark_map_[i, j];
+                    if (!landmark)
+                        continue;
+
+                    if (!merged && i == pos & i > 0) {
                         Landmark prev = landmark_map_[i - 1, j];
-                        if (prev)
-                        {
-                            pos = i;
-                            if (prev.level_ == landmark.level_ && prev.level_ <= 7 && !merged)
-                            {
+                        if (prev) {
+                            if (prev.level_ == landmark.level_) {
+                                landmark.target_merge_ = prev;
+                                MoveLandmark(landmark, new Vector2Int(i - 1, j));
                                 merged = true;
-                                moved = true;
-                                Vector2Int tile_pos = prev.tile_pos_;
-                                int level = prev.level_ + 1;
-                                DeleteLandmark(landmark);
-                                DeleteLandmark(prev);
-                                prev = AddLandmark(tile_pos, level);
                                 continue;
-                            }
-                            pos = i + 1;
-                        }
-                        else
-                        {
-                            prev = landmark;
-                            if (i != pos)
-                            {
-                                merged = true;
-                                moved = true;
-                                MoveLandmark(landmark, new Vector2Int(pos, j));
-                                pos++;
                             }
                         }
                     }
-				}
-			}
-		} else if (Input.GetKeyDown(KeyCode.RightArrow)) {
-			for (int j = 0; j < 4; j++)
-            {
+
+                    if (pos != i)
+                        MoveLandmark(landmark, new Vector2Int(pos, j));
+                    pos++;
+                }
+            }
+        } else if (Input.GetKeyDown(KeyCode.RightArrow)) {
+            for (int j = 0; j < 4; j++) {
+                int pos = 3;
                 bool merged = false;
-                int pos = (landmark_map_[3, j]) ? 2 : 3;
-				for (int i = 2; i >= 0; i--) {
-					Landmark landmark = landmark_map_[i, j];
-					if (landmark)
-                    {
+                for (int i = 3; i >= 0; i--) {
+                    Landmark landmark = landmark_map_[i, j];
+                    if (!landmark)
+                        continue;
+
+                    if (!merged && i == pos & i < 3) {
                         Landmark prev = landmark_map_[i + 1, j];
-                        if (prev)
-                        {
-                            pos = i;
-                            if (prev.level_ == landmark.level_ && prev.level_ <= 7 && !merged)
-                            {
+                        if (prev) {
+                            if (prev.level_ == landmark.level_) {
+                                landmark.target_merge_ = prev;
+                                MoveLandmark(landmark, new Vector2Int(i + 1, j));
                                 merged = true;
-                                moved = true;
-                                Vector2Int tile_pos = prev.tile_pos_;
-                                int level = prev.level_ + 1;
-                                DeleteLandmark(landmark);
-                                DeleteLandmark(prev);
-                                prev = AddLandmark(tile_pos, level);
                                 continue;
-                            }
-                            pos = i - 1;
-                        }
-                        else
-                        {
-                            prev = landmark;
-                            if (i != pos)
-                            {
-                                merged = true;
-                                moved = true;
-                                MoveLandmark(landmark, new Vector2Int(pos, j));
-                                pos--;
                             }
                         }
                     }
-				}
-			}
-		}
 
-		if (moved) {
-			List<Vector2Int> empty_list = new List<Vector2Int>();
-			for (int i = 0; i < 4; i++) {
-				for (int j = 0; j < 4; j++) {
-					if (!landmark_map_[i, j]) {
-						empty_list.Add(new Vector2Int(i, j));
-					}
-				}
-			}
-
-			if (empty_list.Count > 0) {
-                AddLandmark(empty_list[Random.Range(0, empty_list.Count)], 1);
-			}
-
-            moved = false;
-		}
+                    if (pos != i)
+                        MoveLandmark(landmark, new Vector2Int(pos, j));
+                    pos--;
+                }
+            }
+        }
 	}
 
     void MoveLandmark(Landmark landmark, Vector2Int pos)
     {
+        Landmark prev = landmark_map_[pos.x, pos.y];
+        if (prev)
+            DeleteLandmark(prev);
+
         landmark_map_[landmark.tile_pos_.x, landmark.tile_pos_.y] = null;
         landmark_map_[pos.x, pos.y] = landmark;
         landmark.tile_pos_ = pos;
-        landmark.transform.localPosition = PosToWorld(landmark.tile_pos_);
     }
 
     void DeleteLandmark(Vector2Int pos)
     {
-        Destroy(landmark_map_[pos.x, pos.y].gameObject);
         landmark_map_[pos.x, pos.y] = null;
+        landmark_destroy_.Add(landmark_map_[pos.x, pos.y]);
     }
 
     void DeleteLandmark(Landmark landmark)
     {
         landmark_map_[landmark.tile_pos_.x, landmark.tile_pos_.y] = null;
-        Destroy(landmark.gameObject);
+        landmark_destroy_.Add(landmark);
     }
 
     Landmark AddLandmark(Vector2Int pos, int level)
     {
-        if (!landmark_map_[pos.x, pos.y]) {
-            Landmark landmark = landmark_map_[pos.x, pos.y] = Instantiate(landmark_prefab_).GetComponent<Landmark>();
-            landmark.level_ = level;
-            landmark.model_ = Instantiate(model_prefab_[landmark.level_ - 1]);
-            landmark.model_.transform.SetParent(landmark.transform);
-            landmark.model_.transform.localPosition = Vector3.zero;
-            landmark.tile_pos_ = pos;
-            landmark.transform.SetParent(transform);
-            landmark.transform.localPosition = PosToWorld(landmark.tile_pos_);
+        Landmark landmark = landmark_map_[pos.x, pos.y];
+        if (landmark)
+            DeleteLandmark(landmark);
 
-            return landmark;
-        }
+        landmark = landmark_map_[pos.x, pos.y] = Instantiate(landmark_prefab_).GetComponent<Landmark>();
+        landmark.level_ = level;
+        landmark.model_ = Instantiate(model_prefab_[landmark.level_ - 1]);
+        landmark.model_.transform.SetParent(landmark.transform);
+        landmark.model_.transform.localPosition = Vector3.zero;
+        landmark.tile_pos_ = pos;
+        landmark.transform.SetParent(transform);
+        landmark.transform.localPosition = landmark.PosToWorld(landmark.tile_pos_);
 
-        return null;
+        return landmark;
     }
-
-	Vector3 PosToWorld(Vector2Int pos)
-	{
-		Vector3 world;
-		world.x = ((float)pos.x - (1.5f)) * 1.0f;
-		world.y = 0;
-		world.z = ((float)pos.y - (1.5f)) * 1.0f;
-		return world;
-	}
 }
