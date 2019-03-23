@@ -13,11 +13,17 @@ public class GameHandler : MonoBehaviour
 	bool new_turn_ = false;
     int highest_level_ = 1;
     bool is_game_over_ = false;
+    bool is_paused_ = false;
     int score_ = 0;
     float mul = 1;
 
+    public GameObject ui_paused_;
+    public GameObject ui_pause_;
     public GameObject ui_game_over_;
-    public Text ui_score_;
+    public GameObject ui_title_;
+    public GameObject ui_score_;
+    public GameObject ui_panel_;
+    public Text text_score_;
 
 	void Start ()
     {
@@ -47,6 +53,8 @@ public class GameHandler : MonoBehaviour
 
             landmarks.AddLandmark(CreateLandmark(Random.Range(1, 3)));
         }
+
+        UIGame();
 	}
 
     void Update()
@@ -56,6 +64,21 @@ public class GameHandler : MonoBehaviour
 
     void GameUpdate()
     {
+        if (is_paused_)
+        {
+            if (Input.anyKeyDown)
+            {
+                Unpause();
+            }
+
+            return;
+        }
+
+        if (Input.GetKeyDown(KeyCode.Escape) && !is_game_over_)
+        {
+            Pause();
+        }
+
         bool busy = false;
         int score = 0;
 
@@ -98,7 +121,7 @@ public class GameHandler : MonoBehaviour
         if (score > score_)
         {
             score_ = score;
-            ui_score_.text = score_.ToString();
+            text_score_.text = score_.ToString();
         }
 
         if (busy)
@@ -110,8 +133,9 @@ public class GameHandler : MonoBehaviour
         {
             if (!ui_game_over_.activeInHierarchy)
             {
+                UIOffAll();
                 ui_game_over_.SetActive(true);
-                ui_score_.gameObject.SetActive(false);
+                ui_panel_.SetActive(true);
                 return;
             }
 
@@ -342,5 +366,39 @@ public class GameHandler : MonoBehaviour
         world.y = 0;
         world.z = ((float)pos.y - (1.5f)) * 1.0f;
         return world;
+    }
+
+    public void UIGame()
+    {
+        ui_paused_.SetActive(false);
+        ui_pause_.SetActive(true);
+        ui_game_over_.SetActive(false);
+        ui_title_.SetActive(true);
+        ui_score_.SetActive(true);
+        ui_panel_.SetActive(false);
+    }
+
+    public void UIOffAll()
+    {
+        ui_paused_.SetActive(false);
+        ui_pause_.SetActive(false);
+        ui_game_over_.SetActive(false);
+        ui_title_.SetActive(false);
+        ui_score_.SetActive(false);
+        ui_panel_.SetActive(false);
+    }
+
+    public void Pause()
+    {
+        is_paused_ = true;
+        UIOffAll();
+        ui_panel_.SetActive(true);
+        ui_paused_.SetActive(true);
+    }
+
+    public void Unpause()
+    {
+        is_paused_ = false;
+        UIGame();
     }
 }
