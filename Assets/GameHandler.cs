@@ -6,26 +6,47 @@ using UnityEngine.SceneManagement;
 
 public class GameHandler : MonoBehaviour
 {
+    public GameObject landmarks_prefab_;
 	public GameObject landmark_prefab_;
     public GameObject[] model_prefab_;
-	Landmark[,] landmark_map_ = new Landmark[4,4];
-	bool all_busy_ = false;
+	Landmarks[,] landmarks_map_ = new Landmarks[4,4];
+	bool new_turn_ = false;
     int highest_level_ = 1;
     bool is_game_over_ = false;
     int score_ = 0;
+    float mul = 1;
 
     public GameObject ui_game_over_;
     public Text ui_score_;
 
-	void Start () {
-		for (int i = 0; i < 4; i++) {
-			for (int j = 0; j < 4; j++) {
-				if (Random.value > 0.15)
-					continue;
+	void Start ()
+    {
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                Landmarks landmarks = landmarks_map_[i , j] = Instantiate(landmarks_prefab_).GetComponent<Landmarks>();
+                landmarks.transform.SetParent(transform);
+                landmarks.tile_pos_ = new Vector2Int(i, j);
 
-                AddLandmark(new Vector2Int(i, j), 1);
+                Vector3 local_position = PosToWorld(landmarks.tile_pos_);
+                landmarks.transform.localPosition = local_position;
             }
-		}
+        }
+
+
+        int count = Random.Range(3, 6);
+        for (int i = 0; i < count; i++)
+        {
+            Landmarks landmarks;
+            do
+            {
+                landmarks = landmarks_map_[Random.Range(0, 4), Random.Range(0, 4)];
+            }
+            while (!landmarks.Empty());
+
+            landmarks.AddLandmark(CreateLandmark(Random.Range(1, 3)));
+        }
 	}
 
     void Update()
@@ -37,36 +58,63 @@ public class GameHandler : MonoBehaviour
     {
         bool busy = false;
         int score = 0;
-        bool empty = false;
+
+        if (Input.GetKey(KeyCode.UpArrow) || Input.GetKey(KeyCode.DownArrow) || Input.GetKey(KeyCode.LeftArrow) || Input.GetKey(KeyCode.RightArrow))
+        {
+            if (mul < 3f)
+                mul += 0.02f;
+        }
+        else
+        {
+            if (mul > 1f)
+                mul -= 0.1f;
+        }
+
         for (int i = 0; i < 4; i++)
         {
             for (int j = 0; j < 4; j++)
             {
-                Landmark landmark = landmark_map_[i, j];
-                if (!landmark) {
-                    empty = true;
-                    continue;
-                }
+                Landmarks landmarks = landmarks_map_[i, j];
+                
+                landmarks.merged_ = false;
 
-                for (int k = 1; k <= landmark.level_; k++) {
-                    score += 5 * (int)Mathf.Pow(2, k);
-                }
-
-                if (landmark.upgrade_)
+                foreach (Landmark landmark in landmarks.landmark_list_)
                 {
-                    empty = true;
-                    AddLandmark(landmark.tile_pos_, landmark.level_ + 1);
-                    continue;
+                    landmark.Move(mul);
                 }
 
-                landmark.Move();
-                busy = busy || landmark.busy_;
+                if (!landmarks.Busy() && landmarks.landmark_list_.Count > 1)
+                {
+                    int level = (int)Mathf.Log(landmarks.Level(), 2);
+                    landmarks.UpgradeLandmark(CreateLandmark(level));
+                }
+
+                score += landmarks.Level() * 5;
+                
+                busy = busy || landmarks.Busy();
             }
         }
 
+        if (score > score_)
+        {
+            score_ = score;
+            ui_score_.text = score_.ToString();
+        }
+
+        if (busy)
+        {
+            return;
+        }
 
         if (is_game_over_)
         {
+            if (!ui_game_over_.activeInHierarchy)
+            {
+                ui_game_over_.SetActive(true);
+                ui_score_.gameObject.SetActive(false);
+                return;
+            }
+
             if (Input.anyKeyDown)
             {
                 SceneManager.LoadScene(0);
@@ -74,42 +122,23 @@ public class GameHandler : MonoBehaviour
             return;
         }
 
-        if (score > score_) {
-            score_ = score;
-            ui_score_.text = score_.ToString();
-        }
-
-        if (!empty) {
-            is_game_over_ = true;
-            ui_game_over_.SetActive(true);
-            ui_score_.gameObject.SetActive(false);
-            return;
-        }
-
-        if (busy)
+        if (new_turn_)
         {
-            all_busy_ = true;
-            return;
-        }
-
-        if (all_busy_)
-        {
-            all_busy_ = false;
-
-            List<Vector2Int> empty_list = new List<Vector2Int>();
+            new_turn_ = false;
+            
+            List<Landmarks> empty_landmarks = new List<Landmarks>();
             for (int i = 0; i < 4; i++)
             {
                 for (int j = 0; j < 4; j++)
                 {
-                    if (!landmark_map_[i, j])
+                    Landmarks landmarks = landmarks_map_[i, j];
+
+                    if (landmarks.Empty())
                     {
-                        empty_list.Add(new Vector2Int(i, j));
+                        empty_landmarks.Add(landmarks);
                     }
                 }
             }
-
-            if (empty_list.Count <= 0)
-                return;
 
             float max_step = 0;
             for (int i = 0; i < highest_level_; i++)
@@ -130,7 +159,51 @@ public class GameHandler : MonoBehaviour
                 }
             }
 
-            AddLandmark(empty_list[Random.Range(0, empty_list.Count)], level);
+            empty_landmarks[Random.Range(0, empty_landmarks.Count)].AddLandmark(CreateLandmark(level));
+
+            if (empty_landmarks.Count <= 1)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    for (int j = 0; j < 3; j++)
+                    {
+                        Landmarks landmark = landmarks_map_[i, j];
+                        Landmarks next = landmarks_map_[i, j + 1];
+                        if (landmark.Level() == next.Level())
+                            return;
+                    }
+
+                    for (int j = 3; j > 0; j--)
+                    {
+                        Landmarks landmark = landmarks_map_[i, j];
+                        Landmarks next = landmarks_map_[i, j - 1];
+                        if (landmark.Level() == next.Level())
+                            return;
+                    }
+                }
+
+                for (int j = 0; j < 4; j++)
+                {
+                    for (int i = 0; i < 3; i++)
+                    {
+                        Landmarks landmark = landmarks_map_[i, j];
+                        Landmarks next = landmarks_map_[i + 1, j];
+                        if (landmark.Level() == next.Level())
+                            return;
+                    }
+
+                    for (int i = 3; i > 0; i--)
+                    {
+                        Landmarks landmark = landmarks_map_[i, j];
+                        Landmarks next = landmarks_map_[i - 1, j];
+                        if (landmark.Level() == next.Level())
+                            return;
+                    }
+                }
+
+                is_game_over_ = true;
+                return;
+            }
             return;
         }
 
@@ -138,32 +211,27 @@ public class GameHandler : MonoBehaviour
         {
             for (int i = 0; i < 4; i++)
             {
-                int pos = 3;
-                bool merged = false;
-                for (int j = 3; j >= 0; j--)
+                for (int j = 2; j >= 0; j--)
                 {
-                    Landmark landmark = landmark_map_[i, j];
-                    if (!landmark)
+                    Landmarks landmarks = landmarks_map_[i, j];
+                    if (landmarks.Empty())
                         continue;
 
-                    if (!merged && j == pos && j < 3)
+                    Landmarks next = landmarks_map_[i, j + 1];
+                    if (next.Empty() || next.Level() == landmarks.Level())
                     {
-                        Landmark prev = landmark_map_[i, j + 1];
-                        if (prev)
+                        if (next.Level() == landmarks.Level())
                         {
-                            if (prev.level_ == landmark.level_)
-                            {
-                                landmark.target_merge_ = prev;
-                                MoveLandmark(landmark, new Vector2Int(i, j + 1));
-                                merged = true;
+                            if (landmarks.merged_ || next.merged_)
                                 continue;
-                            }
+                            else
+                                landmarks.merged_ = true;
                         }
+                    
+                        landmarks.MoveLandmarks(next);
+                        new_turn_ = true;
+                        j = 3;
                     }
-
-                    if (pos != j)
-                        MoveLandmark(landmark, new Vector2Int(i, pos));
-                    pos--;
                 }
             }
         }
@@ -171,32 +239,27 @@ public class GameHandler : MonoBehaviour
         {
             for (int i = 0; i < 4; i++)
             {
-                int pos = 0;
-                bool merged = false;
-                for (int j = 0; j < 4; j++)
+                for (int j = 1; j < 4; j++)
                 {
-                    Landmark landmark = landmark_map_[i, j];
-                    if (!landmark)
+                    Landmarks landmarks = landmarks_map_[i, j];
+                    if (landmarks.Empty())
                         continue;
 
-                    if (!merged && j == pos & j > 0)
+                    Landmarks next = landmarks_map_[i, j - 1];
+                    if (next.Empty() || next.Level() == landmarks.Level())
                     {
-                        Landmark prev = landmark_map_[i, j - 1];
-                        if (prev)
+                        if (next.Level() == landmarks.Level())
                         {
-                            if (prev.level_ == landmark.level_)
-                            {
-                                landmark.target_merge_ = prev;
-                                MoveLandmark(landmark, new Vector2Int(i, j - 1));
-                                merged = true;
+                            if (landmarks.merged_ || next.merged_)
                                 continue;
-                            }
+                            else
+                                landmarks.merged_ = true;
                         }
+                    
+                        landmarks.MoveLandmarks(next);
+                        new_turn_ = true;
+                        j = 0;
                     }
-
-                    if (pos != j)
-                        MoveLandmark(landmark, new Vector2Int(i, pos));
-                    pos++;
                 }
             }
         }
@@ -204,32 +267,27 @@ public class GameHandler : MonoBehaviour
         {
             for (int j = 0; j < 4; j++)
             {
-                int pos = 0;
-                bool merged = false;
-                for (int i = 0; i < 4; i++)
+                for (int i = 1; i < 4; i++)
                 {
-                    Landmark landmark = landmark_map_[i, j];
-                    if (!landmark)
+                    Landmarks landmarks = landmarks_map_[i, j];
+                    if (landmarks.Empty())
                         continue;
 
-                    if (!merged && i == pos & i > 0)
+                    Landmarks next = landmarks_map_[i - 1, j];
+                    if (next.Empty() || next.Level() == landmarks.Level())
                     {
-                        Landmark prev = landmark_map_[i - 1, j];
-                        if (prev)
+                        if (next.Level() == landmarks.Level())
                         {
-                            if (prev.level_ == landmark.level_)
-                            {
-                                landmark.target_merge_ = prev;
-                                MoveLandmark(landmark, new Vector2Int(i - 1, j));
-                                merged = true;
+                            if (landmarks.merged_ || next.merged_)
                                 continue;
-                            }
+                            else
+                                landmarks.merged_ = true;
                         }
-                    }
 
-                    if (pos != i)
-                        MoveLandmark(landmark, new Vector2Int(pos, j));
-                    pos++;
+                        landmarks.MoveLandmarks(next);
+                        new_turn_ = true;
+                        i = 0;
+                    }
                 }
             }
         }
@@ -237,79 +295,52 @@ public class GameHandler : MonoBehaviour
         {
             for (int j = 0; j < 4; j++)
             {
-                int pos = 3;
-                bool merged = false;
-                for (int i = 3; i >= 0; i--)
+                for (int i = 2; i >= 0; i--)
                 {
-                    Landmark landmark = landmark_map_[i, j];
-                    if (!landmark)
+                    Landmarks landmarks = landmarks_map_[i, j];
+                    if (landmarks.Empty())
                         continue;
 
-                    if (!merged && i == pos & i < 3)
+                    Landmarks next = landmarks_map_[i + 1, j];
+                    if (next.Empty() || next.Level() == landmarks.Level())
                     {
-                        Landmark prev = landmark_map_[i + 1, j];
-                        if (prev)
+                        if (next.Level() == landmarks.Level())
                         {
-                            if (prev.level_ == landmark.level_)
-                            {
-                                landmark.target_merge_ = prev;
-                                MoveLandmark(landmark, new Vector2Int(i + 1, j));
-                                merged = true;
+                            if (landmarks.merged_ || next.merged_)
                                 continue;
-                            }
+                            else
+                                landmarks.merged_ = true;
                         }
-                    }
 
-                    if (pos != i)
-                        MoveLandmark(landmark, new Vector2Int(pos, j));
-                    pos--;
+                        landmarks.MoveLandmarks(next);
+                        new_turn_ = true;
+                        i = 3;
+                    }
                 }
             }
         }
     }
 
-    void MoveLandmark(Landmark landmark, Vector2Int pos)
+    Landmark CreateLandmark(int level)
     {
-        landmark_map_[landmark.tile_pos_.x, landmark.tile_pos_.y] = null;
-        landmark_map_[pos.x, pos.y] = landmark;
-        landmark.tile_pos_ = pos;
-    }
-
-    void DeleteLandmark(Vector2Int pos)
-    {
-        landmark_map_[pos.x, pos.y] = null;
-        Destroy(landmark_map_[pos.x, pos.y].gameObject);
-    }
-
-    void DeleteLandmark(Landmark landmark)
-    {
-        landmark_map_[landmark.tile_pos_.x, landmark.tile_pos_.y] = null;
-        Destroy(landmark.gameObject);
-    }
-
-    Landmark AddLandmark(Vector2Int pos, int level)
-    {
-        Landmark prev = landmark_map_[pos.x, pos.y];
-
         if (level > highest_level_)
             highest_level_ = level;
 
-        Landmark landmark = landmark_map_[pos.x, pos.y] = Instantiate(landmark_prefab_).GetComponent<Landmark>();
+        Landmark landmark = Instantiate(landmark_prefab_).GetComponent<Landmark>();
         landmark.level_ = level;
         landmark.model_ = Instantiate(model_prefab_[landmark.level_ - 1]);
         landmark.model_.transform.SetParent(landmark.transform);
         landmark.model_.transform.localPosition = Vector3.zero;
-        landmark.tile_pos_ = pos;
-        landmark.transform.SetParent(transform);
-
-        Vector3 local_position = landmark.PosToWorld(landmark.tile_pos_);
-        local_position.y = 5;
-        landmark.transform.localPosition = local_position;
-
-        if (prev) {
-            landmark.target_merge_ = prev;
-        }
 
         return landmark;
+    }
+
+    public Vector3 PosToWorld(Vector2Int pos)
+    {
+        Vector3 world;
+        world.x = ((float)pos.x - (1.5f)) * 1.0f;
+        world.y = 0;
+        world.z = ((float)pos.y - (1.5f)) * 1.0f;
+        return world;
     }
 }

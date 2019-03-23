@@ -6,68 +6,53 @@ public class Landmark : MonoBehaviour
 {
 	public int level_ = 1;
 	public GameObject model_ = null;
-	public bool upgrade_ = false;
 	public bool busy_ = true;
 	public float move_speed_ = 5.0f;
     Vector3 acceleration_ = new Vector3(0, 0, 0);
-	public Vector2Int tile_pos_ = new Vector2Int(0, 0);
 
-	public Landmark target_merge_ = null;
-    
-    public void Move ()
+    public Landmarks landmarks_ = null;
+    public List<Landmark> target_ = new List<Landmark>();
+
+    public void Move (float mul)
 	{
-        if (transform.localPosition.y > 0) {
-            acceleration_.y -= 2 * Time.deltaTime;
+        if (transform.localPosition.y > 0)
+        {
+            busy_ = true;
+            acceleration_.y -= 2 * Time.deltaTime * mul;
             Vector3 local_position = transform.localPosition;
             local_position.y += acceleration_.y;
 
-            if (local_position.y < 0.5) {
-                if (target_merge_)
+            if (local_position.y < 0.5)
+            {
+                foreach (Landmark landmark in target_)
                 {
-                    Vector3 target_position = target_merge_.transform.localPosition;
-                    target_position.y = local_position.y - 0.5f;
-
-                    target_merge_.transform.localPosition = target_position;
+                    Destroy(landmark.gameObject);
                 }
+                target_.Clear();
             }
 
-            if (local_position.y < 0) {
+            if (local_position.y < 0)
+            {
                 local_position.y = 0;
                 acceleration_.y = 0;
-
-                if (target_merge_)
-                    Destroy(target_merge_.gameObject);
             }
         
             transform.localPosition = local_position;
         }
-        else {
-            Vector3 target = PosToWorld(tile_pos_);
-            float distance = Vector3.Distance(target, transform.localPosition);
-            if (distance <= move_speed_ * Time.deltaTime)
+        else
+        {
+            Vector3 target = landmarks_.transform.position;
+            float distance = Vector3.Distance(target, transform.position);
+            if (distance <= move_speed_ * Time.deltaTime * mul)
             {
                 busy_ = false;
-                transform.localPosition = target;
-                if (target_merge_)
-                {
-                    Destroy(target_merge_.gameObject);
-                    upgrade_ = true;
-                }
+                transform.position = target;
             }
             else
             {
                 busy_ = true;
-                transform.localPosition += (target - transform.localPosition).normalized * move_speed_ * Time.deltaTime;
+                transform.position += (target - transform.position).normalized * move_speed_ * Time.deltaTime * mul;
             }
         }
-	}
-	
-	public Vector3 PosToWorld(Vector2Int pos)
-	{
-		Vector3 world;
-		world.x = ((float)pos.x - (1.5f)) * 1.0f;
-		world.y = 0;
-		world.z = ((float)pos.y - (1.5f)) * 1.0f;
-		return world;
 	}
 }
