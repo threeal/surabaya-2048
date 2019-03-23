@@ -21,7 +21,7 @@ GameObject:
   - component: {fileID: 4769501198015368}
   - component: {fileID: 114546005837159768}
   m_Layer: 0
-  m_Name: Landmark
+  m_Name: Landmarks
   m_TagString: Untagged
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
@@ -53,3 +53,4 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   landmark_list_: []
   tile_pos_: {x: 0, y: 0}
+  merged_: 0

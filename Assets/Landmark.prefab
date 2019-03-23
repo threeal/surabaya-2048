@@ -53,8 +53,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   level_: 2
   model_: {fileID: 0}
-  upgrade_: 0
   busy_: 0
-  move_speed_: 5
-  tile_pos_: {x: 0, y: 0}
-  target_merge_: {fileID: 0}
+  move_speed_: 6
+  landmarks_: {fileID: 0}
+  target_: []
