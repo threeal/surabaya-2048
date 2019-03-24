@@ -6,12 +6,53 @@ public class Landmark : MonoBehaviour
 {
 	public int level_ = 1;
 	public GameObject model_ = null;
+    MeshRenderer model_renderer_ = null;
+    public GameObject number_ = null;
+    MeshRenderer number_renderer_ = null;
 	public bool busy_ = true;
 	public float move_speed_ = 5.0f;
     Vector3 acceleration_ = new Vector3(0, 0, 0);
 
     public Landmarks landmarks_ = null;
     public List<Landmark> target_ = new List<Landmark>();
+
+    public void SetModel(GameObject model)
+    {
+        model_ = model;
+        model_renderer_ = model_.GetComponentInChildren<MeshRenderer>();
+    }
+
+    public void SetNumber(GameObject number)
+    {
+        number_ = number;
+        number_renderer_ = number_.GetComponentInChildren<MeshRenderer>();
+    }
+
+    public void SetAlpha(float alpha)
+    {
+        if (!model_renderer_ || !number_renderer_)
+            return;
+
+        // Color model_color = model_renderer_.material.color;
+        // Color number_color = number_renderer_.material.color;
+
+        // model_color.a = alpha;
+        // number_color.a = 1 - alpha;
+
+        // model_renderer_.material.color = model_color;
+        // number_renderer_.material.color = number_color;
+
+        if (alpha > 0.5)
+        {
+            model_.SetActive(true);
+            number_.SetActive(false);
+        }
+        else
+        {
+            model_.SetActive(false);
+            number_.SetActive(true);
+        }
+    }
 
     public void Move (float mul)
 	{

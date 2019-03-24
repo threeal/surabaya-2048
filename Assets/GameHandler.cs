@@ -9,21 +9,25 @@ public class GameHandler : MonoBehaviour
     public GameObject landmarks_prefab_;
 	public GameObject landmark_prefab_;
     public GameObject[] model_prefab_;
+    public GameObject[] number_prefab_;
 	Landmarks[,] landmarks_map_ = new Landmarks[4,4];
 	bool new_turn_ = false;
     int highest_level_ = 1;
     bool is_game_over_ = false;
     bool is_paused_ = false;
+    bool is_game_ = false;
     int score_ = 0;
     float mul = 1;
 
-    public GameObject ui_paused_;
+    float alpha_timer_ = 0;
+    
+    float view_y_ = 30;
+
+    public GameObject camera_pan_;
     public GameObject ui_pause_;
     public GameObject ui_game_over_;
-    public GameObject ui_title_;
-    public GameObject ui_score_;
-    public GameObject ui_panel_;
-    public Text text_score_;
+    public GameObject ui_game_;
+    public GameObject ui_menu_;
 
 	void Start ()
     {
@@ -40,6 +44,31 @@ public class GameHandler : MonoBehaviour
             }
         }
 
+        MenuStart();
+    }
+
+    void Update()
+    {
+        if (is_game_)
+        {
+            GameUpdate();
+        }
+        else
+        {
+            MenuUpdate();
+        }
+	}
+
+    public void GameStart()
+    {
+        is_paused_ = false;
+        for (int i = 0; i < 4; i++)
+        {
+            for (int j = 0; j < 4; j++)
+            {
+                landmarks_map_[i, j].ResetLandmark();
+            }
+        }
 
         int count = Random.Range(3, 6);
         for (int i = 0; i < count; i++)
@@ -53,30 +82,42 @@ public class GameHandler : MonoBehaviour
 
             landmarks.AddLandmark(CreateLandmark(Random.Range(1, 3)));
         }
+        
+        view_y_ = 30;
 
-        UIGame();
-	}
-
-    void Update()
-    {
-        GameUpdate();
-	}
+        UIOffAll();
+        ui_game_.SetActive(true);
+        is_game_ = true;
+    }
 
     void GameUpdate()
     {
         if (is_paused_)
         {
-            if (Input.anyKeyDown)
-            {
-                Unpause();
-            }
-
             return;
         }
 
         if (Input.GetKeyDown(KeyCode.Escape) && !is_game_over_)
         {
             Pause();
+        }
+
+        Vector3 euler_angle = camera_pan_.transform.localEulerAngles;
+        if (euler_angle.y < view_y_)
+        {
+            euler_angle.y += 100 * Time.deltaTime;
+            if (euler_angle.y > view_y_)
+                euler_angle.y = view_y_;
+
+            camera_pan_.transform.localEulerAngles = euler_angle;
+        }
+        if (euler_angle.y > view_y_)
+        {
+            euler_angle.y -= 100 * Time.deltaTime;
+            if (euler_angle.y < view_y_)
+                euler_angle.y = view_y_;
+
+            camera_pan_.transform.localEulerAngles = euler_angle;
         }
 
         bool busy = false;
@@ -93,6 +134,7 @@ public class GameHandler : MonoBehaviour
                 mul -= 0.1f;
         }
 
+
         for (int i = 0; i < 4; i++)
         {
             for (int j = 0; j < 4; j++)
@@ -100,6 +142,15 @@ public class GameHandler : MonoBehaviour
                 Landmarks landmarks = landmarks_map_[i, j];
                 
                 landmarks.merged_ = false;
+
+                if (alpha_timer_ > 1.5)
+                {
+                    landmarks.SetAlpha(0f);
+                }
+                else
+                {
+                    landmarks.SetAlpha(1f);
+                }
 
                 foreach (Landmark landmark in landmarks.landmark_list_)
                 {
@@ -121,7 +172,7 @@ public class GameHandler : MonoBehaviour
         if (score > score_)
         {
             score_ = score;
-            text_score_.text = score_.ToString();
+            Score.score_ = score_;
         }
 
         if (busy)
@@ -129,13 +180,14 @@ public class GameHandler : MonoBehaviour
             return;
         }
 
+        alpha_timer_ += Time.deltaTime;
+
         if (is_game_over_)
         {
             if (!ui_game_over_.activeInHierarchy)
             {
                 UIOffAll();
                 ui_game_over_.SetActive(true);
-                ui_panel_.SetActive(true);
                 return;
             }
 
@@ -231,7 +283,26 @@ public class GameHandler : MonoBehaviour
             return;
         }
 
+        int dir = -1;
         if (Input.GetKeyDown(KeyCode.UpArrow))
+        {
+            dir = 0;
+        }
+        else if (Input.GetKeyDown(KeyCode.DownArrow))
+        {
+            dir = 1;
+        }
+        else if (Input.GetKeyDown(KeyCode.LeftArrow))
+        {
+            dir = 2;
+        }
+        else if (Input.GetKeyDown(KeyCode.RightArrow))
+        {
+            dir = 3;
+        }
+
+
+        if (dir == 0)
         {
             for (int i = 0; i < 4; i++)
             {
@@ -254,12 +325,13 @@ public class GameHandler : MonoBehaviour
                     
                         landmarks.MoveLandmarks(next);
                         new_turn_ = true;
+                        alpha_timer_ = 0;
                         j = 3;
                     }
                 }
             }
         }
-        else if (Input.GetKeyDown(KeyCode.DownArrow))
+        else if (dir == 1)
         {
             for (int i = 0; i < 4; i++)
             {
@@ -282,12 +354,13 @@ public class GameHandler : MonoBehaviour
                     
                         landmarks.MoveLandmarks(next);
                         new_turn_ = true;
+                        alpha_timer_ = 0;
                         j = 0;
                     }
                 }
             }
         }
-        else if (Input.GetKeyDown(KeyCode.LeftArrow))
+        else if (dir == 2)
         {
             for (int j = 0; j < 4; j++)
             {
@@ -310,12 +383,13 @@ public class GameHandler : MonoBehaviour
 
                         landmarks.MoveLandmarks(next);
                         new_turn_ = true;
+                        alpha_timer_ = 0;
                         i = 0;
                     }
                 }
             }
         }
-        else if (Input.GetKeyDown(KeyCode.RightArrow))
+        else if (dir == 3)
         {
             for (int j = 0; j < 4; j++)
             {
@@ -338,11 +412,35 @@ public class GameHandler : MonoBehaviour
 
                         landmarks.MoveLandmarks(next);
                         new_turn_ = true;
+                        alpha_timer_ = 0;
                         i = 3;
                     }
                 }
             }
         }
+    }
+
+    public void MenuStart()
+    {
+        is_game_ = false;
+        UIOffAll();
+        ui_menu_.SetActive(true);
+    }
+
+    void MenuUpdate()
+    {
+        Vector3 euler = camera_pan_.transform.localEulerAngles;
+        euler.y += 5f * Time.deltaTime;
+        camera_pan_.transform.localEulerAngles = euler;
+    }
+
+    public void GameExit()
+    {
+        Application.Quit();
+    }
+
+    public void GameHelp()
+    {
     }
 
     Landmark CreateLandmark(int level)
@@ -352,9 +450,13 @@ public class GameHandler : MonoBehaviour
 
         Landmark landmark = Instantiate(landmark_prefab_).GetComponent<Landmark>();
         landmark.level_ = level;
-        landmark.model_ = Instantiate(model_prefab_[landmark.level_ - 1]);
+        landmark.SetModel(Instantiate(model_prefab_[landmark.level_ - 1]));
         landmark.model_.transform.SetParent(landmark.transform);
         landmark.model_.transform.localPosition = Vector3.zero;
+
+        landmark.SetNumber(Instantiate(number_prefab_[landmark.level_ - 1]));
+        landmark.number_.transform.SetParent(landmark.transform);
+        landmark.number_.transform.localPosition = Vector3.zero;
 
         return landmark;
     }
@@ -367,38 +469,26 @@ public class GameHandler : MonoBehaviour
         world.z = ((float)pos.y - (1.5f)) * 1.0f;
         return world;
     }
-
-    public void UIGame()
-    {
-        ui_paused_.SetActive(false);
-        ui_pause_.SetActive(true);
-        ui_game_over_.SetActive(false);
-        ui_title_.SetActive(true);
-        ui_score_.SetActive(true);
-        ui_panel_.SetActive(false);
-    }
-
+    
     public void UIOffAll()
     {
-        ui_paused_.SetActive(false);
+        ui_game_.SetActive(false);
         ui_pause_.SetActive(false);
         ui_game_over_.SetActive(false);
-        ui_title_.SetActive(false);
-        ui_score_.SetActive(false);
-        ui_panel_.SetActive(false);
+        ui_menu_.SetActive(false);
     }
 
     public void Pause()
     {
         is_paused_ = true;
         UIOffAll();
-        ui_panel_.SetActive(true);
-        ui_paused_.SetActive(true);
+        ui_pause_.SetActive(true);
     }
 
     public void Unpause()
     {
         is_paused_ = false;
-        UIGame();
+        UIOffAll();
+        ui_game_.SetActive(true);
     }
 }

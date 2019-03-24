@@ -44,6 +44,14 @@ public class Landmarks : MonoBehaviour
         return false;
     }
 
+    public void SetAlpha(float alpha)
+    {
+        foreach (Landmark landmark in landmark_list_)
+        {
+            landmark.SetAlpha(alpha);
+        }
+    }
+
     public void MoveLandmarks(Landmarks landmarks)
     {
         foreach (Landmark landmark in landmark_list_)
@@ -71,6 +79,16 @@ public class Landmarks : MonoBehaviour
     public void ClearLandmark()
     {
         landmark_list_.Clear();
+    }
+
+    public void ResetLandmark()
+    {
+        foreach (Landmark landmark in landmark_list_)
+        {
+            Destroy(landmark.gameObject);
+        }
+
+        ClearLandmark();
     }
 
     public void UpgradeLandmark(Landmark upgraded)
